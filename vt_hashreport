@@ -1,0 +1,109 @@
+import os
+import requests
+import json
+import time
+from datetime import datetime
+import subprocess
+import logging
+
+# Configuration
+API_KEY = "YOUR_VIRUSTOTAL_API_KEY"
+VIRUSTOTAL_URL = 'https://www.virustotal.com/api/v3/files/'
+HASH_STORAGE_FILE = "submitted_hashes.txt"
+PAUSE_DURATION = 16  # A 16 second delay for each Virustotal submission
+
+logging.basicConfig(level=logging.INFO)
+
+# load and save each hash submitted to VirusTotal prevents duplicated efforts
+def load_submitted_hashes():
+    if os.path.exists(HASH_STORAGE_FILE):
+        with open(HASH_STORAGE_FILE, "r") as file:
+            return set(file.read().splitlines())
+    return set()
+
+def save_submitted_hash(file_hash):
+    with open(HASH_STORAGE_FILE, "a") as file:
+        file.write(f"{file_hash}\n")
+
+def format_timestamp(timestamp):
+    # Format timestamp for 'First Submission Date' and 'Last Analysis Date'
+    return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S') if timestamp else "N/A"
+
+def get_file_creation_date(file_path):
+    # Pull download file creation date from hash file for reporting
+    try:
+        return datetime.fromtimestamp(os.path.getctime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return "Unknown"
+
+def print_analysis_report(file_hash, file_path, attributes):
+    # Prints report in a readable format and is easy to edit
+    votes = attributes.get('total_votes', {})
+    ids_stats = attributes.get('crowdsourced_ids_stats', {})
+    threat_label = attributes.get('popular_threat_classification', {})
+    print(f"""
+File Hash: {file_hash}
+File Creation Date: {get_file_creation_date(file_path)}
+File Name: {attributes.get('meaningful_name', 'N/A')}
+First Submission Date: {format_timestamp(attributes.get('first_submission_date'))}
+Last Analysis Date: {format_timestamp(attributes.get('last_analysis_date'))}
+Reputation: {attributes.get('reputation', 'N/A')}
+Total Votes: Harmless - {votes.get('harmless', 0)}, Malicious - {votes.get('malicious', 0)}
+Size: {attributes.get('size', 'N/A')} bytes
+Suggested Threat Label: {threat_label.get('suggested_threat_label', 'N/A')}
+Crowdsourced IDS Rules: High - {ids_stats.get('high', 0)}, Medium - {ids_stats.get('medium', 0)}, Low - {ids_stats.get('low', 0)}
+--- END OF REPORT ---
+""")
+
+def query_log_files(file_hash, log_folder):
+    # Queries cowrie log files for file hash
+    for log_file in filter(lambda f: os.path.isfile(os.path.join(log_folder, f)), os.listdir(log_folder)):
+        log_file_path = os.path.join(log_folder, log_file)
+        try:
+            with open(log_file_path, "r") as file:
+                if file_hash in file.read():
+                    print(f"\nFile Hash {file_hash} found in log file: {log_file_path}")
+                    result = subprocess.run(["bash", "./process_log.sh", file_hash, log_file_path], capture_output=True, text=True)
+                    if result.returncode == 0:
+                        print(result.stdout)
+                    else:
+                        logging.error(f"Error running bash script: {result.stderr}")
+        except Exception as e:
+            logging.error(f"Error reading log file {log_file_path}: {e}")
+
+def submit_hash_to_virustotal(file_hash, file_path, log_folder):
+    response = requests.get(f"{VIRUSTOTAL_URL}{file_hash}", headers={'x-apikey': API_KEY})
+    try:
+        response_data = response.json()
+    except json.JSONDecodeError:
+        logging.error("Error: Response is not valid JSON.")
+        return
+    if response.status_code == 200:
+        attributes = response_data.get('data', {}).get('attributes', {})
+        print_analysis_report(file_hash, file_path, attributes)
+        # If hash flags a high threat IDS rule then the hash is queried against the cowrie log files
+        if attributes.get('crowdsourced_ids_stats', {}).get('high', 0) > 0:
+            query_log_files(file_hash, log_folder)
+        save_submitted_hash(file_hash)
+    else:
+        logging.error(f"Error for hash {file_hash}: {response.status_code}")
+        logging.error(json.dumps(response_data, indent=2))
+
+def process_files_in_directory(directory_path, log_folder):
+    # Takes directory path input and iterates through file hashes
+    submitted_hashes = load_submitted_hashes()
+    for filename in filter(lambda f: os.path.isfile(os.path.join(directory_path, f)), os.listdir(directory_path)):
+        if filename in submitted_hashes:
+            continue
+        submit_hash_to_virustotal(filename, os.path.join(directory_path, filename), log_folder)
+        time.sleep(PAUSE_DURATION)
+
+if __name__ == "__main__":
+    # This is typically /srv/cowrie/var/lib/cowrie/downloads/
+    directory_path = input("Enter path to cowrie downloads folder: ").strip()
+    # It is recommended to back up cowrie log files
+    log_folder = input("Enter the cowrie log folder path: ").strip()
+    if os.path.isdir(directory_path) and os.path.isdir(log_folder):
+        process_files_in_directory(directory_path, log_folder)
+    else:
+        logging.error("Invalid directory or log folder path.")

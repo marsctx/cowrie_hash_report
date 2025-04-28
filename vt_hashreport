@@ -42,6 +42,8 @@ def print_analysis_report(file_hash, file_path, attributes):
     ids_stats = attributes.get('crowdsourced_ids_stats', {})
     threat_label = attributes.get('popular_threat_classification', {})
     print(f"""
+---- BEGINNING OF REPORT ----
+
 File Hash: {file_hash}
 File Creation Date: {get_file_creation_date(file_path)}
 File Name: {attributes.get('meaningful_name', 'N/A')}
@@ -52,7 +54,6 @@ Total Votes: Harmless - {votes.get('harmless', 0)}, Malicious - {votes.get('mali
 Size: {attributes.get('size', 'N/A')} bytes
 Suggested Threat Label: {threat_label.get('suggested_threat_label', 'N/A')}
 Crowdsourced IDS Rules: High - {ids_stats.get('high', 0)}, Medium - {ids_stats.get('medium', 0)}, Low - {ids_stats.get('low', 0)}
---- END OF REPORT ---
 """)
 
 def query_log_files(file_hash, log_folder):

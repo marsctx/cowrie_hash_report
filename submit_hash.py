@@ -13,18 +13,18 @@ def format_timestamp(timestamp):
 """Print the VirusTotal report in a structured format."""
 def print_report(file_hash, attributes):
     print("\n--- VirusTotal Report ---")
-    print(f"File Hash: {file_hash}")
+    print(f"\n\nFile Hash: {file_hash}")
     print(f"File Name: {attributes.get('meaningful_name', 'N/A')}")
     print(f"First Submission Date: {format_timestamp(attributes.get('first_submission_date'))}")
     print(f"Last Analysis Date: {format_timestamp(attributes.get('last_analysis_date'))}")
     print(f"Reputation: {attributes.get('reputation', 'N/A')}")
     votes = attributes.get('total_votes', {})
-    print(f"Total Votes: Harmless - {votes.get('harmless', 0)}, Malicious - {votes.get('malicious', 0>    print(f"Size: {attributes.get('size', 'N/A')} bytes")
+    print(f"Total Votes: Harmless - {votes.get('harmless', 0)}, Malicious - {votes.get('malicious', 0)}")
+    print(f"Size: {attributes.get('size', 'N/A')} bytes")
     threat_label = attributes.get('popular_threat_classification', {})
     print(f"Suggested Threat Label: {threat_label.get('suggested_threat_label')}")
     ids_stats = attributes.get('crowdsourced_ids_stats')
-    print(f"\nCrowdsourced IDS rules: High - {ids_stats.get('high', 0)}, Medium - {ids_stats.get('med>
-    print("\n--- END OF REPORT ----")
+    print(f"\nCrowdsourced IDS rules: High - {ids_stats.get('high', 0)}, Medium - {ids_stats.get('medium', 0)}, Low - {ids_stats.get('low', 0)}")
 
 def submit_hash_to_virustotal(file_hash):
     url = f"https://www.virustotal.com/api/v3/files/{file_hash}"

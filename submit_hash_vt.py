@@ -2,7 +2,7 @@ import requests
 import sys
 import json
 
-API_KEY = "d989a139b9b851bc69dcadec9343a1ea2469b9b6fb5a4926ff492f800c330968"
+API_KEY = "YOUR_API_KEY"
 
 def submit_hash_vt(file_hash):
     url = f"https://www.virustotal.com/api/v3/files/{file_hash}"

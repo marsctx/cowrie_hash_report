@@ -11,31 +11,30 @@ VIRUSTOTAL_URL = 'https://www.virustotal.com/api/v3/files/'
 HASH_STORAGE_FILE = "submitted_hashes.txt"
 PAUSE_DURATION = 16  # A 16 second delay for each Virustotal submission
 
+# load submitted hash file on program execution and save each hash submitted to VirusTotal
 def load_submitted_hashes():
-    # Load submitted hashes from the storage file to avoid duplcication
     if os.path.exists(HASH_STORAGE_FILE):
         with open(HASH_STORAGE_FILE, "r") as file:
             return set(file.read().splitlines())
     return set()
 
 def save_submitted_hash(file_hash):
-    # Save submitted hash value to the storage file to avoid duplication
     with open(HASH_STORAGE_FILE, "a") as file:
         file.write(f"{file_hash}\n")
 
+# Format timestamp for 'First Submission Date' and 'Last Analysis Date'
 def format_timestamp(timestamp):
-    # Format a timestamp into a human-readable date
     return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S') if timestamp else "N/A"
 
+# Retrieve creation timestamp for each file hash
 def get_file_creation_date(file_path):
-    # Retrieve creation timestamp for each file hash
     try:
         return datetime.fromtimestamp(os.path.getctime(file_path)).strftime('%Y-%m-%d %H:%M:%S')
     except Exception:
         return "Unknown"
 
 def print_analysis_report(file_hash, file_path, attributes):
-    # This report can be easily edited 
+    # This report can be easily edited and tailored, see submit_hash.py for output
     votes = attributes.get('total_votes', {})
     threat_label = attributes.get('popular_threat_classification', {})
     ids_stats = attributes.get('crowdsourced_ids_stats', {})
@@ -55,7 +54,6 @@ Crowdsourced IDS Rules: High - {ids_stats.get('high', 0)}, Medium - {ids_stats.g
 """)
 
 def query_log_files(file_hash, log_folder):
-    """Query log files for the given file hash and pass to
     for log_file in filter(lambda f: os.path.isfile(os.path.join(log_folder, f)), os.listdir(log_folder)):
         log_file_path = os.path.join(log_folder, log_file)
         try:
@@ -71,7 +69,6 @@ def query_log_files(file_hash, log_folder):
             print(f"Error reading log file {log_file_path}: {e}")
 
 def submit_hash_to_virustotal(file_hash, file_path, log_folder):
-    # Submit hash to VirusTotal and print report
     response = requests.get(f"{VIRUSTOTAL_URL}{file_hash}", headers={'x-apikey': API_KEY})
     try:
         response_data = response.json()
@@ -100,7 +97,7 @@ def process_files_in_directory(directory_path, log_folder):
 if __name__ == "__main__":
     # This is typically /srv/cowrie/var/lib/cowrie/downloads/
     directory_path = input("Enter path to cowrie downloads folder: ").strip()
-    # It is recommended to back up cowrie log files
+    # It is recommended to back up cowrie log files and point to that location
     log_folder = input("Enter the cowrie log folder path: ").strip()
     if os.path.isdir(directory_path) and os.path.isdir(log_folder):
         process_files_in_directory(directory_path, log_folder)
